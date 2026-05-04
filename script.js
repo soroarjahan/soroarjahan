@@ -1,141 +1,145 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // 1. Services Accordion Logic
-    const serviceItems = document.querySelectorAll('.service-item');
-
-    serviceItems.forEach(item => {
-        item.addEventListener('click', () => {
-            serviceItems.forEach(otherItem => {
-                if (otherItem !== item) {
-                    otherItem.classList.remove('active');
-                }
-            });
-            item.classList.toggle('active');
-        });
-    });
-
-
-    // 2. Pricing Tabs Logic
-    const tabBtns = document.querySelectorAll('.tab-btn');
+    // ── 1. Pricing Tabs ──────────────────────────────────────────
+    const tabBtns         = document.querySelectorAll('.tab-btn');
     const pricingContents = document.querySelectorAll('.pricing-content');
 
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            // Remove active class from buttons
-            tabBtns.forEach(b => b.classList.remove('active'));
-            // Add active to clicked button
+            tabBtns.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
+            pricingContents.forEach(c => c.classList.remove('active'));
+
             btn.classList.add('active');
+            btn.setAttribute('aria-selected', 'true');
 
-            // Hide all content
-            pricingContents.forEach(content => content.classList.remove('active'));
-
-            // Show target content (guard against missing/invalid target)
             const targetId = btn.getAttribute('data-target');
-            if (!targetId) return;
-
-            const targetEl = document.getElementById(targetId);
-            if (targetEl) {
-                targetEl.classList.add('active');
-            }
+            const targetEl = targetId ? document.getElementById(targetId) : null;
+            if (targetEl) targetEl.classList.add('active');
         });
     });
 
 
-    // 3. Navbar Scroll Effect (guard against missing navbar)
+    // ── 2. Navbar Scroll Effect ───────────────────────────────────
     const navbar = document.querySelector('.navbar');
     if (navbar) {
         window.addEventListener('scroll', () => {
-            if (window.scrollY > 50) {
-                navbar.classList.add('scrolled');
-            } else {
-                navbar.classList.remove('scrolled');
-            }
+            navbar.classList.toggle('scrolled', window.scrollY > 50);
         }, { passive: true });
     }
 
 
-    // 4. Mobile Menu Toggle
+    // ── 3. Mobile Menu Toggle ─────────────────────────────────────
     const mobileToggle = document.querySelector('.mobile-toggle');
-    const navLinks = document.querySelector('.nav-links');
+    const navLinks     = document.querySelector('.nav-links');
+
     if (mobileToggle && navLinks) {
         mobileToggle.addEventListener('click', () => {
-            navLinks.classList.toggle('active');
+            const isOpen = navLinks.classList.toggle('active');
+            mobileToggle.setAttribute('aria-expanded', String(isOpen));
+            // Swap icon
+            const icon = mobileToggle.querySelector('i');
+            if (icon) {
+                icon.classList.toggle('fa-bars',  !isOpen);
+                icon.classList.toggle('fa-times',  isOpen);
+            }
+        });
+
+        // Close menu when any nav link is clicked
+        navLinks.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', () => {
+                navLinks.classList.remove('active');
+                mobileToggle.setAttribute('aria-expanded', 'false');
+                const icon = mobileToggle.querySelector('i');
+                if (icon) { icon.classList.add('fa-bars'); icon.classList.remove('fa-times'); }
+            });
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!navbar.contains(e.target) && navLinks.classList.contains('active')) {
+                navLinks.classList.remove('active');
+                mobileToggle.setAttribute('aria-expanded', 'false');
+                const icon = mobileToggle.querySelector('i');
+                if (icon) { icon.classList.add('fa-bars'); icon.classList.remove('fa-times'); }
+            }
         });
     }
 
 
-    // 5. Smooth Scrolling for Anchor Links
+    // ── 4. Smooth Scrolling for Anchor Links ─────────────────────
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         anchor.addEventListener('click', function (e) {
             const href = this.getAttribute('href');
-
-            // Allow normal behavior if href is missing
-            if (!href) return;
-
-            // Prevent default only when we can handle the scroll target safely
-            e.preventDefault();
-
-            // Handle "back to top" links like href="#"
-            if (href === '#') {
+            if (!href || href === '#') {
+                e.preventDefault();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 return;
             }
-
             let target = null;
-            try {
-                target = document.querySelector(href);
-            } catch {
-                // Invalid selector; do nothing to avoid runtime error
-                return;
-            }
-
+            try { target = document.querySelector(href); } catch { return; }
             if (target) {
-                target.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
-                });
+                e.preventDefault();
+                const navHeight = navbar ? navbar.offsetHeight : 0;
+                const top = target.getBoundingClientRect().top + window.scrollY - navHeight - 8;
+                window.scrollTo({ top, behavior: 'smooth' });
             }
         });
     });
 
 
-    // 6. Entrance Animations with IntersectionObserver (FIXED)
+    // ── 5. Skill Bar Animation (IntersectionObserver) ─────────────
+    const skillBars = document.querySelectorAll('.skill-bar .bar span[data-width]');
+
+    if ('IntersectionObserver' in window && skillBars.length) {
+        const barObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const span = entry.target;
+                    const targetWidth = span.getAttribute('data-width') || '0';
+                    // Small delay for staggered feel
+                    setTimeout(() => {
+                        span.style.width = targetWidth + '%';
+                    }, 100);
+                    barObserver.unobserve(span);
+                }
+            });
+        }, { threshold: 0.3 });
+
+        skillBars.forEach(span => barObserver.observe(span));
+    } else {
+        // Fallback – show bars immediately
+        skillBars.forEach(span => {
+            span.style.width = (span.getAttribute('data-width') || '0') + '%';
+        });
+    }
+
+
+    // ── 6. Section Entrance Animations ───────────────────────────
     const sections = document.querySelectorAll('.section');
 
-    // Set transition property on all sections first
-    sections.forEach(section => {
-        section.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
+    sections.forEach(sec => {
+        sec.style.transition = 'opacity 0.65s ease-out, transform 0.65s ease-out';
     });
 
-    // Check if IntersectionObserver is supported
     if (!('IntersectionObserver' in window)) {
-        // Fallback for older browsers: show sections immediately
-        sections.forEach(section => {
-            section.style.opacity = '1';
-            section.style.transform = 'translateY(0)';
-        });
+        sections.forEach(sec => { sec.style.opacity = '1'; sec.style.transform = 'none'; });
         return;
     }
 
-    // Modern browsers: use IntersectionObserver
-    const observerOptions = {
-        threshold: 0.1
-    };
-
-    const observer = new IntersectionObserver((entries) => {
+    const sectionObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
-                entry.target.style.opacity = '1';
+                entry.target.style.opacity  = '1';
                 entry.target.style.transform = 'translateY(0)';
-                observer.unobserve(entry.target);
+                sectionObserver.unobserve(entry.target);
             }
         });
-    }, observerOptions);
+    }, { threshold: 0.08 });
 
-    // Set initial hidden state and observe
-    sections.forEach(section => {
-        section.style.opacity = '0';
-        section.style.transform = 'translateY(30px)';
-        observer.observe(section);
+    sections.forEach(sec => {
+        sec.style.opacity  = '0';
+        sec.style.transform = 'translateY(28px)';
+        sectionObserver.observe(sec);
     });
+
 });
